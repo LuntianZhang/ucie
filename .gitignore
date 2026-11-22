@@ -82,3 +82,6 @@ out/
 
 chippy/
 generatedVerilog/
+
+# Windows download metadata
+*:Zone.Identifier
