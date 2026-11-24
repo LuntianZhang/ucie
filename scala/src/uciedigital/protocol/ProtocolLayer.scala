@@ -17,6 +17,7 @@ class ProtocolLayer(
 ) extends Module {
   val io = IO(new ProtocolLayerIO(params, fdiParams))
 
+  // 创建链路状态控制器、主带收发 FIFO 和边带通道。
   val stateController = Module(new ProtocolStateController())
   val mainbandTx = Module(
     new ProtocolMainbandTx(fdiParams.nBytes, params.txQueueDepth)
@@ -33,6 +34,7 @@ class ProtocolLayer(
     )
   )
 
+  // 将芯片侧请求、FDI 状态和收发模块的反馈送给状态控制器。
   stateController.io.ctrl <> io.ctrl
   stateController.io.fdi.plStateSts := io.fdi.plStateSts
   stateController.io.fdi.plInbandPres := io.fdi.plInbandPres
@@ -45,6 +47,7 @@ class ProtocolLayer(
   stateController.io.txIdle := mainbandTx.io.txIdle
   stateController.io.rxReadyForActive := mainbandRx.io.rxReadyForActive
 
+  // 将控制器生成的链路请求和握手应答送回 FDI。
   io.fdi.lpStateReq := stateController.io.fdi.lpStateReq
   io.fdi.lpLinkError := stateController.io.fdi.lpLinkError
   io.fdi.lpStallAck := stateController.io.fdi.lpStallAck
@@ -52,6 +55,7 @@ class ProtocolLayer(
   io.fdi.lpClkAck := stateController.io.fdi.lpClkAck
   io.fdi.lpRxActiveSts := stateController.io.fdi.lpRxActiveSts
 
+  // 芯片侧数据经 TX FIFO 送到 FDI，ACTIVE 状态和 stall 控制发送。
   mainbandTx.io.chip <> io.mainbandTx
   mainbandTx.io.fdi.plTrdy := io.fdi.plTrdy
   mainbandTx.io.active := io.fdi.plStateSts === FDIState.active
@@ -60,6 +64,7 @@ class ProtocolLayer(
   io.fdi.lpValid := mainbandTx.io.fdi.lpValid
   io.fdi.lpData := mainbandTx.io.fdi.lpData
 
+  // FDI 数据经 RX FIFO 送到芯片侧，控制器提供接收激活和清除信号。
   mainbandRx.io.fdi.plValid := io.fdi.plValid
   mainbandRx.io.fdi.plData := io.fdi.plData
   mainbandRx.io.active := io.fdi.plStateSts === FDIState.active
@@ -67,6 +72,7 @@ class ProtocolLayer(
   mainbandRx.io.clear := stateController.io.clearRuntimeState
   io.mainbandRx <> mainbandRx.io.chip
 
+  // 连接 FDI 边带数据、有效位及两个方向的信用返回。
   sidebandChannel.io.fdi.in.bits := io.fdi.plCfg
   sidebandChannel.io.fdi.in.valid := io.fdi.plCfgVld
   sidebandChannel.io.fdi.txCreditReturn := io.fdi.lpCfgCrd
@@ -80,6 +86,7 @@ class ProtocolLayer(
   sidebandChannel.io.layer.in.valid := false.B
   sidebandChannel.io.layer.out.ready := true.B
 
+  // 对外报告链路及协商状态，RX 溢出直接来自接收模块。
   io.status.linkState := stateController.io.status.linkState
   io.status.negotiatedProtocolValid := stateController.io.status.negotiatedProtocolValid
   io.status.negotiatedProtocol := stateController.io.status.negotiatedProtocol
@@ -88,6 +95,7 @@ class ProtocolLayer(
   io.status.rxOverflow := mainbandRx.io.rxOverflow
 }
 
+// 使用默认参数展开协议层并生成 SystemVerilog。
 object MainProtocolLayer extends App {
   ChiselStage.emitSystemVerilogFile(
     new ProtocolLayer(),
